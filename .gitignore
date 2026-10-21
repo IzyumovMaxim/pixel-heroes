@@ -1,2 +1,5 @@
 docs/
 .env
+.ruff_cache/
+.venv/
+data/

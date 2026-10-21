@@ -4,4 +4,11 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "accelerate>=1.15.0",
+    "datasets>=5.1.0",
+    "diffusers>=0.41.0",
+    "peft>=0.21.2",
+    "torch>=2.14.1",
+    "transformers>=5.20.2",
+]
