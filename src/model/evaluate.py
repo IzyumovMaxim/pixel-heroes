@@ -9,6 +9,7 @@ from config import load_config
 from paths import TEST_DATASET_PATH, OUTPUTS_DIR
 
 config = load_config("test")
+config_train = load_config("train")
 set_seed(config["seed"])
 
 def test_model(model, tokenizer, max_new_tokens: int = config["max_new_tokens"]) -> float:
@@ -45,7 +46,7 @@ if __name__ == "__main__":
     base_exact_match = test_model(base_model, tokenizer)
     print(f"Base model exact match: {base_exact_match}")
 
-    model = PeftModel.from_pretrained(base_model, OUTPUTS_DIR / "lora_adapter")
+    model = PeftModel.from_pretrained(base_model, OUTPUTS_DIR / config_train["adapter_dir"])
     model = model.merge_and_unload()
     model.to(device)
     model.eval()
