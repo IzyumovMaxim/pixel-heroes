@@ -1,6 +1,6 @@
 from datasets import load_dataset
 from peft import get_peft_model, LoraConfig, TaskType
-from transformers import Trainer, TrainingArguments, AutoModelForCausalLM, AutoTokenizer, DataCollatorForSeq2Seq, set_seed
+from transformers import Trainer, TrainingArguments, AutoModelForCausalLM, AutoTokenizer, DataCollatorForSeq2Seq, set_seed, EarlyStoppingCallback
 
 from config import load_config, save_config
 from paths import TRAIN_DATASET_PATH, TEST_DATASET_PATH, OUTPUTS_DIR
@@ -26,7 +26,10 @@ model = get_peft_model(model, peft_config)
 model.print_trainable_parameters()
 
 train_dataset = load_dataset("json", data_files=str(TRAIN_DATASET_PATH), split='train')
-test_dataset = load_dataset("json", data_files=str(TEST_DATASET_PATH), split='train')
+
+split = train_dataset.train_test_split(test_size=config["training"]["eval_size"], seed=config["seed"])
+train_dataset = split["train"]
+eval_dataset = split["test"]
 
 def tokenize_function(examples):
     prompt = f"spoken: {examples['input']}. latex:"
@@ -42,13 +45,15 @@ def tokenize_function(examples):
     }
 
 train_dataset = train_dataset.map(tokenize_function, remove_columns=train_dataset.column_names)
-test_dataset = test_dataset.map(tokenize_function, remove_columns=test_dataset.column_names)
+eval_dataset = eval_dataset.map(tokenize_function, remove_columns=eval_dataset.column_names)
 
 collator = DataCollatorForSeq2Seq(tokenizer, padding=True, label_pad_token_id=-100)
 
 training_args = TrainingArguments(
     output_dir=OUTPUTS_DIR / config["adapter_dir"],
     eval_strategy="steps",
+    save_strategy="steps",
+    save_steps=config["training"]["save_steps"],
     learning_rate=config["training"]["learning_rate"],
     per_device_train_batch_size=config["training"]["per_device_train_batch_size"],
     per_device_eval_batch_size=config["training"]["per_device_eval_batch_size"],
@@ -57,14 +62,19 @@ training_args = TrainingArguments(
     report_to=config["training"]["report_to"],
     eval_steps=config["training"]["eval_steps"],
     logging_steps=config["training"]["logging_steps"],
+    load_best_model_at_end=True,
+    metric_for_best_model="eval_loss",
+    greater_is_better=False,
+    save_total_limit=config["training"]["save_total_limit"],
 )
 
 trainer = Trainer(
     model=model,
     args=training_args,
     train_dataset=train_dataset,
-    eval_dataset=test_dataset,
+    eval_dataset=eval_dataset,
     data_collator=collator,
+    callbacks=[EarlyStoppingCallback(early_stopping_patience=config["training"]["early_stopping_patience"])],
 )
 
 trainer.train()
