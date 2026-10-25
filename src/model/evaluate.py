@@ -5,13 +5,17 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed
 from peft import PeftModel
 
-set_seed(42)
+from config import load_config
+from paths import TEST_DATASET_PATH, OUTPUTS_DIR
 
-def test_model(model, tokenizer, test_dataset_path: str, max_new_tokens: int = 100) -> float:
+config = load_config("test")
+set_seed(config["seed"])
+
+def test_model(model, tokenizer, max_new_tokens: int = config["max_new_tokens"]) -> float:
     '''Test model on test split of MathBridge dataset'''
     correct = 0
     incorrect = 0
-    with open(test_dataset_path, "r") as f:
+    with open(TEST_DATASET_PATH, "r") as f:
         progress =  tqdm.tqdm(f)
         for line in progress:
             example = json.loads(line)
@@ -30,15 +34,21 @@ def test_model(model, tokenizer, test_dataset_path: str, max_new_tokens: int = 1
 
 
 if __name__ == "__main__":
-    checkpoint = "HuggingFaceTB/SmolLM-135M"
+    checkpoint = config["checkpoint"]
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     tokenizer = AutoTokenizer.from_pretrained(checkpoint)
     base_model = AutoModelForCausalLM.from_pretrained(checkpoint)
-    model = PeftModel.from_pretrained(base_model, "outputs/lora_adapter")
+    base_model.to(device)
+    base_model.eval()
+
+    base_exact_match = test_model(base_model, tokenizer)
+    print(f"Base model exact match: {base_exact_match}")
+
+    model = PeftModel.from_pretrained(base_model, OUTPUTS_DIR / "lora_adapter")
     model = model.merge_and_unload()
     model.to(device)
     model.eval()
 
-    exact_match = test_model(model, tokenizer, "data/mathbridge/test.jsonl")
-    print(f"Exact match: {exact_match}")
+    exact_match = test_model(model, tokenizer)
+    print(f"Fine-tuned exact match: {exact_match}")

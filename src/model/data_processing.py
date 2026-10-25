@@ -4,35 +4,35 @@ import json
 import random
 import datasets
 
-MATH_BRIDGE_DATASET_PATH = "data/mathbridge"
-MATH_BRIDGE_RAW_DATASET_PATH = os.path.join(MATH_BRIDGE_DATASET_PATH, "raw_train.jsonl")
-MATH_BRIDGE_PROCESSED_DATASET_PATH = os.path.join(MATH_BRIDGE_DATASET_PATH, "processed_train.jsonl")
-MATH_BRIDGE_TEST_DATASET_PATH = os.path.join(MATH_BRIDGE_DATASET_PATH, "test.jsonl")
-MATH_BRIDGE_TRAIN_DATASET_PATH = os.path.join(MATH_BRIDGE_DATASET_PATH, "train.jsonl")
+from config import load_config
 
-def load_data(num_examples: int = 10000):
+from paths import DATASET_DIR, RAW_TRAIN_DATASET_PATH, PROCESSED_TRAIN_DATASET_PATH, TEST_DATASET_PATH, TRAIN_DATASET_PATH
+
+config = load_config("data")
+
+def load_data(num_examples: int = config["num_examples"]):
     '''Load the MathBridge dataset'''
-    if os.path.exists(MATH_BRIDGE_RAW_DATASET_PATH):
+    if os.path.exists(RAW_TRAIN_DATASET_PATH):
         return
-    os.makedirs(MATH_BRIDGE_DATASET_PATH)
+    os.makedirs(DATASET_DIR)
     try:
-        dataset = datasets.load_dataset("aaai25withanonymous/MathBridge", split="train", streaming=True)
-        subset = dataset.shuffle(seed=42).take(num_examples)
-        with open(MATH_BRIDGE_RAW_DATASET_PATH, "w") as f:
+        dataset = datasets.load_dataset(config["dataset"], split="train", streaming=True)
+        subset = dataset.shuffle(seed=config["seed"]).take(config["num_examples"])
+        with open(RAW_TRAIN_DATASET_PATH, "w") as f:
             for example in subset:
                     f.write(json.dumps(example) + "\n")
     except Exception as e:
         print(f"Error loading dataset: {e}")
-        if os.path.exists(MATH_BRIDGE_RAW_DATASET_PATH):
-            os.rmdir(MATH_BRIDGE_RAW_DATASET_PATH)
+        if os.path.exists(RAW_TRAIN_DATASET_PATH):
+            os.rmdir(RAW_TRAIN_DATASET_PATH)
 
 def process_math_bridge_data():
     '''Create training pairs from the MathBridge dataset'''
-    if not os.path.exists(MATH_BRIDGE_RAW_DATASET_PATH):
+    if not os.path.exists(RAW_TRAIN_DATASET_PATH):
         print("MathBridge dataset not found")
         return
     try:
-        with open(MATH_BRIDGE_RAW_DATASET_PATH, "r") as source, open(MATH_BRIDGE_PROCESSED_DATASET_PATH, "w") as processed:
+        with open(RAW_TRAIN_DATASET_PATH, "r") as source, open(PROCESSED_TRAIN_DATASET_PATH, "w") as processed:
             for line in source:
                 raw_line = json.loads(line)
                 equation = raw_line["equation"].replace("$", "").strip()
@@ -41,19 +41,19 @@ def process_math_bridge_data():
     except Exception as e:
         print(f"Error processing MathBridge dataset: {e}")
 
-def train_test_split(test_size: float = 0.1):
+def train_test_split(test_size: float = config["test_size"]):
     '''Split the MathBridge dataset into training and testing sets'''
-    if not os.path.exists(MATH_BRIDGE_PROCESSED_DATASET_PATH):
+    if not os.path.exists(PROCESSED_TRAIN_DATASET_PATH):
         print("MathBridge dataset not found")
         return
     try:
-        with open(MATH_BRIDGE_PROCESSED_DATASET_PATH, "r") as source:
+        with open(PROCESSED_TRAIN_DATASET_PATH, "r") as source:
             lines = source.readlines()
             random.shuffle(lines)
             test_size = int(len(lines) * test_size)
             test_lines = lines[:test_size]
             train_lines = lines[test_size:]
-            with open(MATH_BRIDGE_TEST_DATASET_PATH, "w") as test, open(MATH_BRIDGE_TRAIN_DATASET_PATH, "w") as train:
+            with open(TEST_DATASET_PATH, "w") as test, open(TRAIN_DATASET_PATH, "w") as train:
                 for line in test_lines:
                     test.write(line)
                 for line in train_lines:

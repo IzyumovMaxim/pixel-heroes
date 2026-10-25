@@ -1,26 +1,32 @@
 from datasets import load_dataset
 from peft import get_peft_model, LoraConfig, TaskType
-from transformers import Trainer, TrainingArguments, AutoModelForCausalLM, AutoTokenizer, DataCollatorForSeq2Seq
+from transformers import Trainer, TrainingArguments, AutoModelForCausalLM, AutoTokenizer, DataCollatorForSeq2Seq, set_seed
 
-checkpoint = "HuggingFaceTB/SmolLM-135M"
+from config import load_config, save_config
+from paths import TRAIN_DATASET_PATH, TEST_DATASET_PATH, OUTPUTS_DIR
+
+config = load_config("train")
+
+checkpoint = config["checkpoint"]
+set_seed(config["seed"])
 
 model = AutoModelForCausalLM.from_pretrained(checkpoint)
 tokenizer = AutoTokenizer.from_pretrained(checkpoint)
 tokenizer.pad_token = tokenizer.eos_token
 
 peft_config = LoraConfig(
-    r=8,
-    lora_alpha=16,
-    target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
-    lora_dropout=0.1,
-    bias="none",
+    r=config["lora"]["r"],
+    lora_alpha=config["lora"]["lora_alpha"],
+    target_modules=config["lora"]["target_modules"],
+    lora_dropout=config["lora"]["lora_dropout"],
+    bias=config["lora"]["bias"],
     task_type=TaskType.CAUSAL_LM,
 )
 model = get_peft_model(model, peft_config)
 model.print_trainable_parameters()
 
-train_dataset = load_dataset("json", data_files="data/mathbridge/train.jsonl", split='train')
-test_dataset = load_dataset("json", data_files="data/mathbridge/test.jsonl", split='train')
+train_dataset = load_dataset("json", data_files=str(TRAIN_DATASET_PATH), split='train')
+test_dataset = load_dataset("json", data_files=str(TEST_DATASET_PATH), split='train')
 
 def tokenize_function(examples):
     prompt = f"spoken: {examples['input']}. latex:"
@@ -41,16 +47,16 @@ test_dataset = test_dataset.map(tokenize_function, remove_columns=test_dataset.c
 collator = DataCollatorForSeq2Seq(tokenizer, padding=True, label_pad_token_id=-100)
 
 training_args = TrainingArguments(
-    output_dir="outputs",
+    output_dir=OUTPUTS_DIR / config["adapter_dir"],
     eval_strategy="steps",
-    learning_rate=2e-4,
-    per_device_train_batch_size=16,
-    per_device_eval_batch_size=16,
-    num_train_epochs=3,
-    weight_decay=0.01,
-    report_to="none",
-    eval_steps=50,
-    logging_steps=10,
+    learning_rate=config["training"]["learning_rate"],
+    per_device_train_batch_size=config["training"]["per_device_train_batch_size"],
+    per_device_eval_batch_size=config["training"]["per_device_eval_batch_size"],
+    num_train_epochs=config["training"]["num_train_epochs"],
+    weight_decay=config["training"]["weight_decay"],
+    report_to=config["training"]["report_to"],
+    eval_steps=config["training"]["eval_steps"],
+    logging_steps=config["training"]["logging_steps"],
 )
 
 trainer = Trainer(
@@ -63,4 +69,5 @@ trainer = Trainer(
 
 trainer.train()
 
-model.save_pretrained("outputs/lora_adapter")
+model.save_pretrained(OUTPUTS_DIR / config["adapter_dir"])
+save_config(config, "train", save_dir=OUTPUTS_DIR / config["adapter_dir"])

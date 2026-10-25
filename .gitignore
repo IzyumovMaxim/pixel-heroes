@@ -3,3 +3,8 @@ docs/
 .ruff_cache/
 .venv/
 /data
+uv.lock
+.python-version
+outputs/
+.DS_Store
+*pycache*

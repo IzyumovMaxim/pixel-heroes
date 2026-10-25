@@ -1,0 +1,20 @@
+checkpoint: "HuggingFaceTB/SmolLM-135M"
+adapter_dir: "lora_adapter"
+seed: 42
+
+lora:
+  target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
+  lora_dropout: 0.1
+  bias: "none"
+  r: 8
+  lora_alpha: 16
+
+training:
+  learning_rate: 2.0e-4
+  per_device_train_batch_size: 16
+  per_device_eval_batch_size: 16
+  num_train_epochs: 3
+  weight_decay: 0.01
+  report_to: "none"
+  eval_steps: 50
+  logging_steps: 10

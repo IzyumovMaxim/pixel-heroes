@@ -1,0 +1,4 @@
+dataset: "aaai25withanonymous/MathBridge"
+seed: 42
+num_examples: 10000
+test_size: 0.1
